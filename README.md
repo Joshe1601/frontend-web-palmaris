@@ -1,36 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Grupo Palmaris · Panel de administración (`/admin`)
 
-## Getting Started
+Next.js (App Router) + Supabase (Postgres, Auth, Realtime) + Tailwind + Leaflet.
 
-First, run the development server:
+## Puesta en marcha
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `cp .env.example .env.local` y completa `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` y
+   `SUPABASE_SERVICE_ROLE_KEY` (esta última solo se usa en `app/api/choferes`, nunca llega al navegador).
+2. Aplica la migración `supabase/migrations/20261009000000_init_schema.sql` (con `supabase link` + `supabase db push`,
+   o pegándola una sola vez en el SQL Editor).
+3. Crea el primer admin (ver sección 9 de la migración) y completa las coordenadas del almacén en **/admin/configuracion**.
+4. `npm run dev` → http://localhost:3000/admin
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Esquema y tipos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- La migración inicial **no se edita**: cualquier cambio va en una migración nueva (`supabase migration new <nombre>`).
+- `npm run types` regenera `types/database.ts` (requiere `supabase link`); `npm run types:local` usa la BD local (Docker).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run typecheck` · `npm test` · `npm run lint` · `npm run build`
