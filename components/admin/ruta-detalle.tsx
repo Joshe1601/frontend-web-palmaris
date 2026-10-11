@@ -7,6 +7,7 @@ import { useSupabase } from "@/hooks/use-supabase";
 import { cn } from "@/lib/cn";
 import { ETIQUETA_PARADA, TONO_PARADA, avance } from "@/lib/fleet";
 import { fechaCorta, horaCorta, kmATexto, minutosATexto } from "@/lib/format";
+import { decodePolyline } from "@/lib/routing/polyline";
 import { unwrap } from "@/lib/supabase/unwrap";
 import { Chip } from "@/components/ui/chip";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +52,7 @@ export function RutaDetalle({ id }: { id: string }) {
     () => (c && c.almacen_lat != null && c.almacen_lng != null ? { lat: Number(c.almacen_lat), lng: Number(c.almacen_lng) } : null),
     [c],
   );
+  const geometria = ruta?.geometria ?? null;
   const paradas = useMemo(() => [...(ruta?.paradas ?? [])].sort((a, b) => a.orden - b.orden), [ruta]);
 
   const { markers, lines } = useMemo(() => {
@@ -72,10 +74,11 @@ export function RutaDetalle({ id }: { id: string }) {
       });
     }
     if (depot) pts.push([depot.lat, depot.lng]);
-    // Polilínea recta en el orden calculado: solo referencia visual, no ruteo vial.
-    const lines: MapLine[] = [{ id: "ruta", points: pts, tone: "forest", weight: 4, opacity: 0.8 }];
+    // Trazado por calles si se guardó; si no, línea recta en el orden calculado (solo referencia visual).
+    const trazado = geometria ? decodePolyline(geometria) : pts;
+    const lines: MapLine[] = [{ id: "ruta", points: trazado, tone: "forest", weight: 4, opacity: 0.8 }];
     return { markers, lines };
-  }, [paradas, depot]);
+  }, [paradas, depot, geometria]);
 
   if (loading && !data) return <div className="p-7 text-[13.5px] text-muted">Cargando ruta…</div>;
   if (error) {
@@ -178,7 +181,9 @@ export function RutaDetalle({ id }: { id: string }) {
             })}
           </div>
           <p className="flex-none border-t border-line-soft px-[18px] py-2.5 text-[11.5px] text-muted">
-            Distancias en línea recta (Haversine); la línea del mapa es solo referencia visual, no ruteo vial.
+            {ruta.geometria
+              ? "Distancias y trazado por calles (OpenRouteService). Los tiempos usan la velocidad promedio configurada, sin tráfico."
+              : "Esta ruta no tiene trazado por calles: distancias y línea en recta (Haversine), solo como referencia."}
           </p>
         </section>
 

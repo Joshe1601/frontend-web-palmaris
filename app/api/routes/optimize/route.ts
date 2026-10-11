@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getClientesDisponibles } from "@/lib/data/clientes-disponibles";
 import { describeDbError } from "@/lib/db-errors";
+import { fetchRoadRoute } from "@/lib/routing/ors";
 import { planificarRuta } from "@/lib/routing/plan";
 import { parseHora } from "@/lib/routing/schedule";
 import { createClient } from "@/lib/supabase/server";
@@ -88,13 +89,26 @@ export async function POST(request: Request) {
   const clientes = clienteIds.map((id) => porId.get(id)!);
 
   // --- algoritmo ---------------------------------------------------------------
-  const plan = planificarRuta({
-    depot: { lat: Number(config.almacen_lat), lng: Number(config.almacen_lng) },
-    clientes: clientes.map((c) => ({ ...c, pedidoIds: c.pedidos.map((p) => p.id) })),
-    speedKmh: Number(config.velocidad_promedio_kmh),
-    serviceMin: config.tiempo_atencion_min,
-    horaSalida,
-  });
+  // Trazado por calles con OpenRouteService (clave solo en el servidor). Sin clave o si falla: línea recta.
+  const orsKey = process.env.OPENROUTESERVICE_API_KEY;
+  const roadProvider = orsKey
+    ? (puntos: Parameters<typeof fetchRoadRoute>[0]) =>
+        fetchRoadRoute(puntos, { apiKey: orsKey }).catch((e: unknown) => {
+          console.error("[ruteo] OpenRouteService falló:", e instanceof Error ? e.message : e);
+          throw e;
+        })
+    : undefined;
+
+  const plan = await planificarRuta(
+    {
+      depot: { lat: Number(config.almacen_lat), lng: Number(config.almacen_lng) },
+      clientes: clientes.map((c) => ({ ...c, pedidoIds: c.pedidos.map((p) => p.id) })),
+      speedKmh: Number(config.velocidad_promedio_kmh),
+      serviceMin: config.tiempo_atencion_min,
+      horaSalida,
+    },
+    roadProvider,
+  );
 
   // --- persistencia: una sola transacción (RPC) con la sesión del admin ------------
   const { data: rutaId, error: rpcError } = await supabase.rpc("crear_ruta_con_paradas", {
@@ -109,12 +123,23 @@ export async function POST(request: Request) {
   });
   if (rpcError) return fail(describeDbError(rpcError), 500);
 
+  // El trazado se guarda aparte: es accesorio, y si falla la ruta sigue siendo válida (se verá en línea recta).
+  let ruteo = plan.ruteo;
+  if (plan.geometria && rutaId) {
+    const { error: geoError } = await supabase.from("rutas").update({ geometria: plan.geometria }).eq("id", rutaId);
+    if (geoError) {
+      console.error("[ruteo] no se pudo guardar la geometría:", geoError.message);
+      ruteo = "lineal";
+    }
+  }
+
   return NextResponse.json(
     {
       ruta_id: rutaId,
       distancia_km: plan.totalKm,
       tiempo_estimado_min: plan.totalMin,
       hora_regreso: plan.horaRegreso,
+      ruteo,
       paradas: plan.paradas,
     },
     { status: 201 },

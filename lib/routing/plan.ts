@@ -1,5 +1,6 @@
 import type { Coord } from "./haversine";
 import { optimizeRoute } from "./optimize";
+import type { RoadRoute } from "./ors";
 import { buildSchedule } from "./schedule";
 
 export type ClientePlan = {
@@ -28,24 +29,45 @@ export type RutaPlanificada = {
   totalKm: number;
   totalMin: number;
   horaRegreso: string;
+  /** Trazado por calles (polyline) o null si no hubo ruteo vial. */
+  geometria: string | null;
+  ruteo: "vial" | "lineal";
 };
 
-/** Optimiza el orden, calcula ETAs y arma el arreglo de paradas para la RPC. Sin I/O. */
-export function planificarRuta(params: {
-  depot: Coord;
-  clientes: ClientePlan[];
-  speedKmh: number;
-  serviceMin: number;
-  horaSalida: string;
-}): RutaPlanificada {
+/**
+ * Optimiza el orden (Haversine), pide opcionalmente el trazado por calles al `roadProvider`,
+ * calcula ETAs y arma el arreglo de paradas para la RPC. Si el proveedor falla, se usa línea recta.
+ * Los tiempos salen siempre de la velocidad promedio configurada.
+ */
+export async function planificarRuta(
+  params: {
+    depot: Coord;
+    clientes: ClientePlan[];
+    speedKmh: number;
+    serviceMin: number;
+    horaSalida: string;
+  },
+  roadProvider?: (puntos: Coord[]) => Promise<RoadRoute>,
+): Promise<RutaPlanificada> {
   const { depot, clientes } = params;
   const porId = new Map(clientes.map((c) => [c.id, c]));
   const { order } = optimizeRoute(
     depot,
     clientes.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng })),
   );
+
+  let road: RoadRoute | null = null;
+  if (roadProvider) {
+    try {
+      road = await roadProvider([depot, ...order, depot]);
+    } catch {
+      road = null; // sin servicio de ruteo: se sigue con línea recta
+    }
+  }
+
   const schedule = buildSchedule({
     depot,
+    legsKm: road?.legsKm,
     orderedStops: order.map((s) => ({
       ...s,
       ventanaInicio: porId.get(s.id)!.ventana_horario_inicio,
@@ -69,5 +91,7 @@ export function planificarRuta(params: {
     totalKm: schedule.totalKm,
     totalMin: schedule.totalMin,
     horaRegreso: schedule.horaRegreso,
+    geometria: road?.geometry ?? null,
+    ruteo: road ? "vial" : "lineal",
   };
 }

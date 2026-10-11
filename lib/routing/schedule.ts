@@ -60,8 +60,16 @@ export function buildSchedule(params: {
   serviceMin: number;
   /** Hora de salida "HH:MM". */
   departure: string;
+  /**
+   * Distancia (km) de cada tramo almacén -> p1 -> ... -> pn -> almacén (n + 1 valores), p. ej. por calles.
+   * Si no se pasa, se usa la distancia en línea recta (Haversine).
+   */
+  legsKm?: number[];
 }): Schedule {
-  const { depot, orderedStops, speedKmh, serviceMin } = params;
+  const { depot, orderedStops, speedKmh, serviceMin, legsKm } = params;
+  if (legsKm && legsKm.length !== orderedStops.length + 1) {
+    throw new Error("legsKm debe tener un tramo por parada más el regreso");
+  }
   const start = parseHora(params.departure);
   if (start === null) throw new Error("Hora de salida inválida");
   if (!(speedKmh > 0)) throw new Error("La velocidad promedio debe ser mayor que 0");
@@ -70,7 +78,7 @@ export function buildSchedule(params: {
   let prev: Coord = depot;
   let totalKm = 0;
   const stops: ScheduledStop[] = orderedStops.map((s, i) => {
-    const km = haversineKm(prev, s);
+    const km = legsKm ? legsKm[i]! : haversineKm(prev, s);
     const travel = (km / speedKmh) * 60;
     const arrive = clock + travel;
     const eta = Math.round(arrive);
@@ -93,7 +101,7 @@ export function buildSchedule(params: {
     };
   });
 
-  const backKm = haversineKm(prev, depot);
+  const backKm = legsKm ? legsKm[orderedStops.length]! : haversineKm(prev, depot);
   const back = (backKm / speedKmh) * 60;
   totalKm += backKm;
   const end = clock + back;

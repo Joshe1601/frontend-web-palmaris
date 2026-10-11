@@ -91,4 +91,16 @@ describe("buildSchedule", () => {
     const t1 = (haversineKm(ALMACEN, A) / 30) * 60;
     expect(s.stops[1]!.horaEstimadaLlegada).toBe(formatHora(480 + t1 + 10));
   });
+
+  it("usa distancias viales si se entregan y el tiempo sale de la velocidad configurada", () => {
+    const s = buildSchedule({ ...base, orderedStops: [A], legsKm: [15, 12] });
+    expect(s.stops[0]!.distanciaKm).toBe(15);
+    expect(s.stops[0]!.tiempoMin).toBe(30); // 15 km a 30 km/h
+    expect(s.totalKm).toBe(27);
+    expect(s.totalMin).toBe(Math.round(((15 + 12) / 30) * 60 + 10));
+  });
+
+  it("legsKm debe tener n + 1 tramos", () => {
+    expect(() => buildSchedule({ ...base, orderedStops: [A], legsKm: [15] })).toThrow();
+  });
 });

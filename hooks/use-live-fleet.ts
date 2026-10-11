@@ -21,6 +21,8 @@ export type LiveTruck = {
   chofer: string;
   placa: string;
   zona: string | null;
+  /** Trazado por calles (polyline) o null. */
+  geometria: string | null;
   paradas: LiveParada[];
   /** Último ping GPS del chofer en esta ruta. */
   pos: { lat: number; lng: number; at: string } | null;
@@ -52,7 +54,7 @@ export function useLiveFleet() {
           await supabase
             .from("rutas")
             .select(
-              "id, zona, chofer_id, choferes(nombre), vehiculos(placa, alias), paradas(id, orden, estado, clientes(nombre, lat, lng))",
+              "id, zona, geometria, chofer_id, choferes(nombre), vehiculos(placa, alias), paradas(id, orden, estado, clientes(nombre, lat, lng))",
             )
             .eq("estado", "en_curso"),
         ) ?? [];
@@ -78,6 +80,7 @@ export function useLiveFleet() {
           chofer: r.choferes.nombre,
           placa: r.vehiculos.alias ?? r.vehiculos.placa,
           zona: r.zona,
+          geometria: r.geometria,
           paradas: [...r.paradas]
             .sort((a, b) => a.orden - b.orden)
             .map((p) => ({

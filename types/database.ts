@@ -222,6 +222,7 @@ export type Database = {
           iniciada_at: string | null
           finalizada_at: string | null
           created_at: string
+          geometria: string | null
         }
         Insert: {
           id?: string
@@ -235,6 +236,7 @@ export type Database = {
           iniciada_at?: string | null
           finalizada_at?: string | null
           created_at?: string
+          geometria?: string | null
         }
         Update: {
           id?: string
@@ -248,6 +250,7 @@ export type Database = {
           iniciada_at?: string | null
           finalizada_at?: string | null
           created_at?: string
+          geometria?: string | null
         }
         Relationships: [
           {

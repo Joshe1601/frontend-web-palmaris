@@ -165,13 +165,17 @@ export function GenerarRuta() {
           hora_salida: horaSalida || "08:00",
         }),
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string; ruta_id?: string };
+      const json = (await res.json().catch(() => ({}))) as { error?: string; ruta_id?: string; ruteo?: "vial" | "lineal" };
       if (!res.ok || !json.ruta_id) {
         setError(json.error ?? "No se pudo generar la ruta.");
         if (res.status === 409) base.reload();
         return;
       }
-      toast("Ruta creada y asignada al chofer");
+      toast(
+        json.ruteo === "vial"
+          ? "Ruta creada y asignada al chofer"
+          : "Ruta creada con distancias en línea recta (el servicio de ruteo por calles no estuvo disponible)",
+      );
       router.push(`/admin/rutas/${json.ruta_id}`);
     } catch {
       setError("No se pudo conectar con el servidor.");
@@ -392,7 +396,7 @@ export function GenerarRuta() {
                 );
               })}
               <p className="py-3 text-[11.5px] leading-snug text-muted">
-                Distancias en línea recta (Haversine). Es una referencia, no ruteo vial.
+                Vista previa en línea recta (Haversine). Al crear la ruta se calcula el trazado por calles.
               </p>
             </div>
           ) : (

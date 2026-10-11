@@ -7,6 +7,7 @@ import { useQuery } from "@/hooks/use-query";
 import { useSupabase } from "@/hooks/use-supabase";
 import { cn } from "@/lib/cn";
 import { ETIQUETA_PARADA, TONO_PARADA, avance, toneDeCamion } from "@/lib/fleet";
+import { decodePolyline } from "@/lib/routing/polyline";
 import { unwrap } from "@/lib/supabase/unwrap";
 import { MapView } from "@/components/map/map-view";
 import type { MapLine, MapMarker } from "@/components/map/types";
@@ -66,7 +67,7 @@ export function Monitor() {
         ...t.paradas.filter((p) => p.lat != null).map((p): [number, number] => [p.lat!, p.lng!]),
         ...(depot ? [[depot.lat, depot.lng] as [number, number]] : []),
       ];
-      lines.push({ id: t.rutaId, points: pts, tone, weight: esSel ? 6 : 3, opacity: esSel ? 0.85 : 0.35 });
+      lines.push({ id: t.rutaId, points: t.geometria ? decodePolyline(t.geometria) : pts, tone, weight: esSel ? 6 : 3, opacity: esSel ? 0.85 : 0.35 });
       if (esSel) {
         for (const p of t.paradas) {
           if (p.lat == null) continue;
