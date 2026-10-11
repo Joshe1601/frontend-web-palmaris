@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react
 import { cn } from "@/lib/cn";
 
 export const controlClass =
-  "w-full rounded-lg border border-field bg-white px-2.5 py-2.5 text-[13px] text-ink outline-none transition-colors placeholder:text-stone focus:border-forest focus:ring-2 focus:ring-forest/15 disabled:bg-canvas disabled:text-muted";
+  "rounded-lg border border-field bg-white px-2.5 py-2.5 text-[13px] text-ink outline-none transition-colors placeholder:text-stone focus:border-forest focus:ring-2 focus:ring-forest/15 disabled:bg-canvas disabled:text-muted";
 
 export function Field({
   label,
@@ -32,13 +32,16 @@ export function Field({
   );
 }
 
+/** Ancho completo salvo que se indique otra clase `w-*`. */
+const ancho = (className?: string) => (className && /(^|\s)w-/.test(className) ? "" : "w-full");
+
 export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(controlClass, className)} {...rest} />;
+  return <input className={cn(controlClass, ancho(className), className)} {...rest} />;
 }
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={cn(controlClass, "pr-8", className)} {...rest}>
+    <select className={cn(controlClass, ancho(className), "pr-8", className)} {...rest}>
       {children}
     </select>
   );

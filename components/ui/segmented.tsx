@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 
 const wrap = "flex w-max gap-0.5 rounded-[11px] bg-tab p-1";
-const item = "rounded-lg px-5 py-2 text-sm font-semibold transition-colors";
+const item = "whitespace-nowrap rounded-lg px-5 py-2 text-sm font-semibold transition-colors";
 const on = "bg-forest text-white";
 const off = "text-ink-soft hover:bg-white/60";
 

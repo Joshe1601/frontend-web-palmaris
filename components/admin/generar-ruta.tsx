@@ -181,7 +181,7 @@ export function GenerarRuta() {
   }
 
   return (
-    <div className="absolute inset-0 flex flex-col gap-3.5 px-5 pb-5 pt-4">
+    <div className="absolute inset-0 flex flex-col gap-3.5 overflow-auto px-5 pb-5 pt-4">
       <div className="flex flex-none items-center gap-3">
         <RutasTabs />
         <div className="flex-1" />
@@ -204,7 +204,7 @@ export function GenerarRuta() {
 
       {base.error && <FormError message={base.error} />}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[392px_minmax(0,1fr)_360px] gap-3.5">
+      <div className="grid min-h-[640px] flex-1 grid-cols-[392px_minmax(0,1fr)_360px] gap-3.5">
         {/* Columna izquierda: pasos 1 a 3 */}
         <div className="flex min-h-0 flex-col gap-3">
           <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-white p-4">
@@ -221,7 +221,7 @@ export function GenerarRuta() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-line-soft">
+            <div className="min-h-[200px] flex-1 overflow-auto rounded-lg border border-line-soft">
               {base.loading && !base.data ? (
                 <div className="flex items-center gap-2 p-4 text-[13px] text-muted">
                   <Spinner /> Cargando clientes…
