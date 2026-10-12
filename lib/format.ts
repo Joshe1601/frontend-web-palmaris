@@ -35,3 +35,19 @@ export function iniciales(nombre: string): string {
       .join("") || "?"
   );
 }
+
+/** Hora local de Perú (HH:MM) de un instante ISO. */
+export function horaLima(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("es-PE", {
+    timeZone: "America/Lima",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/** Minutos (con un decimal) entre dos instantes ISO. */
+export function minutosEntre(desde: string, hasta: string): number {
+  return Math.round(((Date.parse(hasta) - Date.parse(desde)) / 60_000) * 10) / 10;
+}

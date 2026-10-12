@@ -29,12 +29,35 @@ export function ChoferForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+
+  async function eliminar() {
+    if (!chofer) return;
+    setBorrando(true);
+    setFormError(null);
+    try {
+      const res = await fetch(`/api/choferes/${chofer.id}`, { method: "DELETE" });
+      const json = (await res.json().catch(() => ({}))) as { error?: string; aviso?: string };
+      if (!res.ok) {
+        setConfirmarBorrado(false);
+        return setFormError(json.error ?? "No se pudo eliminar el chofer.");
+      }
+      toast(json.aviso ?? "Chofer eliminado");
+      onSaved();
+    } catch {
+      setFormError("No se pudo conectar con el servidor.");
+    } finally {
+      setBorrando(false);
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
     const errs: Record<string, string> = {};
     if (!nombre.trim()) errs.nombre = "El nombre es obligatorio.";
+    if (chofer && password && password.length < PASSWORD_MIN) errs.password = `Mínimo ${PASSWORD_MIN} caracteres.`;
     if (!chofer) {
       if (!DNI_REGEX.test(dni.trim())) errs.dni = "El DNI debe tener 8 dígitos.";
       if (password.length < PASSWORD_MIN) errs.password = `Mínimo ${PASSWORD_MIN} caracteres.`;
@@ -50,7 +73,16 @@ export function ChoferForm({
           .update({ nombre: nombre.trim(), telefono: telefono.trim() || null, activo })
           .eq("id", chofer.id);
         if (error) return setFormError(describeDbError(error));
-        toast("Chofer actualizado");
+        if (password) {
+          const res = await fetch(`/api/choferes/${chofer.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+          });
+          const json = (await res.json().catch(() => ({}))) as { error?: string };
+          if (!res.ok) return setFormError(`Datos guardados, pero ${json.error ?? "no se pudo cambiar la contraseña."}`);
+        }
+        toast(password ? "Chofer y contraseña actualizados" : "Chofer actualizado");
       } else {
         // El alta pasa por el servidor: allí (con service_role) se crea el usuario de Auth.
         const res = await fetch("/api/choferes", {
@@ -94,21 +126,43 @@ export function ChoferForm({
             <Input inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
           </Field>
         </div>
-        {!chofer && (
-          <Field label="Contraseña *" error={errors.password} hint="La usará el chofer en su app.">
+        <Field
+            label={chofer ? "Nueva contraseña (opcional)" : "Contraseña *"}
+            error={errors.password}
+            hint={chofer ? "Déjala vacía para no cambiarla." : "La usará el chofer en su app."}
+          >
             <Input
               type="text"
               autoComplete="off"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-          </Field>
-        )}
+        </Field>
         {chofer && (
           <Checkbox label="Chofer activo" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
         )}
         <FormError message={formError} />
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex items-center justify-end gap-2 pt-2">
+          {chofer &&
+            (confirmarBorrado ? (
+              <div className="mr-auto flex items-center gap-2 text-[13px]">
+                <span className="text-bad">¿Eliminar definitivamente?</span>
+                <Button variant="danger" size="sm" loading={borrando} onClick={eliminar}>
+                  Sí, eliminar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirmarBorrado(false)}>
+                  No
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="mr-auto border-bad/40 text-bad hover:bg-chip-bad"
+                onClick={() => setConfirmarBorrado(true)}
+              >
+                Eliminar
+              </Button>
+            ))}
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>

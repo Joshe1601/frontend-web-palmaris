@@ -54,9 +54,16 @@ export function ClientesView() {
       .select("id", { count: "exact", head: true })
       .eq("activo", true)
       .is("lat", null);
+    const config = unwrap(
+      await supabase.from("configuracion").select("almacen_lat, almacen_lng").eq("id", true).maybeSingle(),
+    );
     return {
       zonas: [...new Set(zonas.map((z) => z.zona!))].sort((a, b) => a.localeCompare(b)),
       sinCoordenadas: sin.count ?? 0,
+      almacen:
+        config && config.almacen_lat != null && config.almacen_lng != null
+          ? { lat: Number(config.almacen_lat), lng: Number(config.almacen_lng) }
+          : null,
     };
   }, []);
 
@@ -163,6 +170,7 @@ export function ClientesView() {
         <ClienteForm
           cliente={editing === "nuevo" ? null : editing}
           zonas={zonas}
+          centro={meta.data?.almacen}
           onClose={() => setEditing(null)}
           onSaved={onSaved}
         />

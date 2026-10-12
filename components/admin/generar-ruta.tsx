@@ -7,6 +7,7 @@ import { useQuery } from "@/hooks/use-query";
 import { useSupabase } from "@/hooks/use-supabase";
 import { cn } from "@/lib/cn";
 import { getClientesDisponibles } from "@/lib/data/clientes-disponibles";
+import { choferesOcupados } from "@/lib/disponibilidad";
 import { hoyLima, kmATexto, minutosATexto } from "@/lib/format";
 import { optimizeRoute } from "@/lib/routing/optimize";
 import { buildSchedule } from "@/lib/routing/schedule";
@@ -36,19 +37,29 @@ export function GenerarRuta() {
   const [error, setError] = useState<string | null>(null);
 
   const base = useQuery(async () => {
-    const [config, clientes, choferes, vehiculos] = await Promise.all([
+    const [config, clientes, choferes, vehiculos, abiertas] = await Promise.all([
       supabase.from("configuracion").select("*").eq("id", true).maybeSingle(),
       getClientesDisponibles(supabase),
       supabase.from("choferes").select("id, nombre").eq("activo", true).order("nombre"),
       supabase.from("vehiculos").select("id, placa, alias").eq("activo", true).order("placa"),
+      supabase.from("rutas").select("chofer_id, fecha, estado").in("estado", ["pendiente", "en_curso"]),
     ]);
     return {
       config: unwrap(config),
       clientes,
       choferes: unwrap(choferes) ?? [],
       vehiculos: unwrap(vehiculos) ?? [],
+      abiertas: (unwrap(abiertas) ?? []) as { chofer_id: string; fecha: string; estado: "pendiente" | "en_curso" }[],
     };
   }, []);
+
+  // Choferes que ya tienen ruta ese día (o una en curso) no se ofrecen para otra.
+  const ocupados = useMemo(() => choferesOcupados(base.data?.abiertas ?? [], fecha), [base.data, fecha]);
+  const choferesLibres = useMemo(
+    () => (base.data?.choferes ?? []).filter((c) => !ocupados.has(c.id)),
+    [base.data, ocupados],
+  );
+  const choferSel = choferesLibres.some((c) => c.id === choferId) ? choferId : "";
 
   const config = base.data?.config ?? null;
   const clientes = useMemo(() => base.data?.clientes ?? [], [base.data]);
@@ -146,8 +157,8 @@ export function GenerarRuta() {
     return [{ id: "preview", points: pts, tone: "forest", weight: 4 }];
   }, [depot, preview]);
 
-  const chofer = base.data?.choferes.find((c) => c.id === choferId);
-  const puedeOptimizar = !!depot && seleccionados.length > 0 && !!choferId && !!vehiculoId && !!fecha;
+  const chofer = choferesLibres.find((c) => c.id === choferSel);
+  const puedeOptimizar = !!depot && seleccionados.length > 0 && !!choferSel && !!vehiculoId && !!fecha;
 
   async function optimizar() {
     setEnviando(true);
@@ -158,7 +169,7 @@ export function GenerarRuta() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cliente_ids: seleccionados.map((c) => c.id),
-          chofer_id: choferId,
+          chofer_id: choferSel,
           vehiculo_id: vehiculoId,
           fecha,
           zona: zona || null,
@@ -285,9 +296,9 @@ export function GenerarRuta() {
             </h2>
             <div className="grid grid-cols-2 gap-2.5">
               <Field label="Chofer">
-                <Select value={choferId} onChange={(e) => setChoferId(e.target.value)}>
+                <Select value={choferSel} onChange={(e) => setChoferId(e.target.value)}>
                   <option value="">Seleccionar…</option>
-                  {base.data?.choferes.map((c) => (
+                  {choferesLibres.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nombre}
                     </option>
@@ -304,6 +315,15 @@ export function GenerarRuta() {
                   ))}
                 </Select>
               </Field>
+              {ocupados.size > 0 && (
+                <p className="col-span-2 -mt-1 text-[12px] text-muted">
+                  {ocupados.size} {ocupados.size === 1 ? "chofer no aparece" : "choferes no aparecen"}: ya tienen una ruta
+                  asignada para esta fecha o en curso.
+                </p>
+              )}
+              {base.data && choferesLibres.length === 0 && (
+                <p className="col-span-2 text-[12px] text-bad">No hay choferes disponibles para esta fecha.</p>
+              )}
               <Field label="Hora de salida" className="col-span-2">
                 <Input type="time" value={horaSalida} onChange={(e) => setHoraSalida(e.target.value)} />
               </Field>

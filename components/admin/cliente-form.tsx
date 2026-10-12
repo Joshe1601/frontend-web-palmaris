@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useSupabase } from "@/hooks/use-supabase";
 import { describeDbError } from "@/lib/db-errors";
-import { validarCoordenadas, validarVentana } from "@/lib/validation";
+import { PERU, validarCoordenadas, validarVentana } from "@/lib/validation";
+import { LocationPicker } from "@/components/map/location-picker";
 import type { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Field, FormError, Input } from "@/components/ui/form";
@@ -13,11 +14,14 @@ import { useToast } from "@/components/ui/toast";
 export function ClienteForm({
   cliente,
   zonas,
+  centro,
   onClose,
   onSaved,
 }: {
   cliente: Tables<"clientes"> | null;
   zonas: string[];
+  /** Dónde centrar el mapa si el cliente aún no tiene coordenadas (el almacén). */
+  centro?: { lat: number; lng: number } | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -34,6 +38,31 @@ export function ClienteForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+
+  // Pin del mapa: solo si los campos tienen un par de coordenadas válido dentro de Perú.
+  const parsed = validarCoordenadas(lat, lng);
+  const pinLat = !parsed.errors.lat && !parsed.errors.lng ? parsed.lat : null;
+  const pinLng = pinLat === null ? null : parsed.lng;
+
+  async function eliminar() {
+    if (!cliente) return;
+    setBorrando(true);
+    setFormError(null);
+    const { error } = await supabase.from("clientes").delete().eq("id", cliente.id);
+    setBorrando(false);
+    if (error) {
+      setConfirmarBorrado(false);
+      return setFormError(
+        error.code === "23503"
+          ? "Este cliente tiene pedidos o rutas asociadas y no se puede eliminar. Desmarca «Cliente activo» para ocultarlo de las rutas."
+          : describeDbError(error),
+      );
+    }
+    toast("Cliente eliminado");
+    onSaved();
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -95,6 +124,39 @@ export function ClienteForm({
             <Input inputMode="decimal" value={lng} onChange={(e) => setLng(e.target.value)} />
           </Field>
         </div>
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[11.5px] font-medium text-muted">
+              Ubicación en el mapa: haz clic para colocar el pin y arrástralo para ajustarlo
+            </span>
+            {(lat || lng) && (
+              <button
+                type="button"
+                className="text-[12px] font-semibold text-forest underline"
+                onClick={() => {
+                  setLat("");
+                  setLng("");
+                }}
+              >
+                Quitar ubicación
+              </button>
+            )}
+          </div>
+          <LocationPicker
+            lat={pinLat}
+            lng={pinLng}
+            centro={centro}
+            onChange={(la, ln) => {
+              // Solo se aceptan puntos dentro del rango de Perú que exige la BD.
+              if (la < PERU.latMin || la > PERU.latMax || ln < PERU.lngMin || ln > PERU.lngMax) {
+                return setFormError("Ese punto está fuera de Perú.");
+              }
+              setFormError(null);
+              setLat(la.toFixed(6));
+              setLng(ln.toFixed(6));
+            }}
+          />
+        </div>
         {!lat.trim() && !lng.trim() && (
           <p className="rounded-lg bg-chip-warn px-3 py-2 text-[12.5px] text-chip-warn-ink">
             Sin coordenadas este cliente no podrá entrar a una ruta.
@@ -117,7 +179,27 @@ export function ClienteForm({
         </div>
         <Checkbox label="Cliente activo" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
         <FormError message={formError} />
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex items-center justify-end gap-2 pt-2">
+          {cliente &&
+            (confirmarBorrado ? (
+              <div className="mr-auto flex items-center gap-2 text-[13px]">
+                <span className="text-bad">¿Eliminar definitivamente?</span>
+                <Button variant="danger" size="sm" loading={borrando} onClick={eliminar}>
+                  Sí, eliminar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setConfirmarBorrado(false)}>
+                  No
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="mr-auto border-bad/40 text-bad hover:bg-chip-bad"
+                onClick={() => setConfirmarBorrado(true)}
+              >
+                Eliminar
+              </Button>
+            ))}
           <Button variant="outline" onClick={onClose}>
             Cancelar
           </Button>

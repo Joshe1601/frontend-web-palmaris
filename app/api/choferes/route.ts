@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/api/require-admin";
 import { describeDbError } from "@/lib/db-errors";
 import { DNI_REGEX, PASSWORD_MIN, emailDeChofer } from "@/lib/choferes";
 import { createServiceRoleAuthClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 type Body = { nombre?: unknown; dni?: unknown; telefono?: unknown; password?: unknown };
 
@@ -15,13 +15,9 @@ const error = (message: string, status: number) => NextResponse.json({ error: me
  */
 export async function POST(request: Request) {
   // El proxy ya filtra, pero esta ruta usa service_role: se verifica de nuevo aquí.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return error("No autenticado", 401);
-  const { data: esAdmin } = await supabase.rpc("es_admin");
-  if (!esAdmin) return error("Acceso denegado", 403);
+  const guard = await requireAdmin();
+  if ("error" in guard) return guard.error;
+  const { supabase } = guard;
 
   let body: Body;
   try {

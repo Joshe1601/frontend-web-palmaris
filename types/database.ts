@@ -38,6 +38,8 @@ export type Database = {
           velocidad_promedio_kmh: number
           tiempo_atencion_min: number
           updated_at: string
+          radio_llegada_m: number
+          umbral_estacionamiento_min: number
         }
         Insert: {
           id?: boolean
@@ -46,6 +48,8 @@ export type Database = {
           velocidad_promedio_kmh?: number
           tiempo_atencion_min?: number
           updated_at?: string
+          radio_llegada_m?: number
+          umbral_estacionamiento_min?: number
         }
         Update: {
           id?: boolean
@@ -54,6 +58,8 @@ export type Database = {
           velocidad_promedio_kmh?: number
           tiempo_atencion_min?: number
           updated_at?: string
+          radio_llegada_m?: number
+          umbral_estacionamiento_min?: number
         }
         Relationships: []
       }
@@ -282,6 +288,8 @@ export type Database = {
           advertencia_ventana: boolean
           motivo_rechazo: string | null
           marcada_at: string | null
+          llegada_at: string | null
+          llegada_distancia_m: number | null
         }
         Insert: {
           id?: string
@@ -295,6 +303,8 @@ export type Database = {
           advertencia_ventana?: boolean
           motivo_rechazo?: string | null
           marcada_at?: string | null
+          llegada_at?: string | null
+          llegada_distancia_m?: number | null
         }
         Update: {
           id?: string
@@ -308,6 +318,8 @@ export type Database = {
           advertencia_ventana?: boolean
           motivo_rechazo?: string | null
           marcada_at?: string | null
+          llegada_at?: string | null
+          llegada_distancia_m?: number | null
         }
         Relationships: [
           {
@@ -352,6 +364,67 @@ export type Database = {
             columns: ["pedido_id"]
             isOneToOne: false
             referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pausas: {
+        Row: {
+          id: string
+          ruta_id: string
+          chofer_id: string
+          parada_id: string | null
+          lat: number | null
+          lng: number | null
+          inicio_at: string
+          fin_at: string | null
+          motivo: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ruta_id: string
+          chofer_id: string
+          parada_id?: string | null
+          lat?: number | null
+          lng?: number | null
+          inicio_at?: string
+          fin_at?: string | null
+          motivo: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          ruta_id?: string
+          chofer_id?: string
+          parada_id?: string | null
+          lat?: number | null
+          lng?: number | null
+          inicio_at?: string
+          fin_at?: string | null
+          motivo?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pausas_ruta_id_fkey"
+            columns: ["ruta_id"]
+            isOneToOne: false
+            referencedRelation: "rutas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pausas_chofer_id_fkey"
+            columns: ["chofer_id"]
+            isOneToOne: false
+            referencedRelation: "choferes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pausas_parada_id_fkey"
+            columns: ["parada_id"]
+            isOneToOne: false
+            referencedRelation: "paradas"
             referencedColumns: ["id"]
           },
         ]
@@ -410,6 +483,10 @@ export type Database = {
         Args: never
         Returns: string
       }
+      distancia_m: {
+        Args: { lat1: number; lat2: number; lng1: number; lng2: number }
+        Returns: number
+      }
       es_admin: {
         Args: never
         Returns: boolean
@@ -439,6 +516,21 @@ export type Database = {
           p_motivo?: string
         }
         Returns: Json
+      }
+      registrar_llegada: {
+        Args: { p_lat: number; p_lng: number; p_parada_id: string }
+        Returns: Json
+      }
+      registrar_pausa: {
+        Args: {
+          p_fin_at: string
+          p_inicio_at: string
+          p_lat: number
+          p_lng: number
+          p_motivo: string
+          p_ruta_id: string
+        }
+        Returns: string
       }
     }
     Enums: {

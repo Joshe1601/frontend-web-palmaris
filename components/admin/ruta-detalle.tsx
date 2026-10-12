@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
 import { useSupabase } from "@/hooks/use-supabase";
 import { cn } from "@/lib/cn";
 import { ETIQUETA_PARADA, TONO_PARADA, avance } from "@/lib/fleet";
-import { fechaCorta, horaCorta, kmATexto, minutosATexto } from "@/lib/format";
+import { fechaCorta, horaCorta, horaLima, kmATexto, minutosATexto, minutosEntre } from "@/lib/format";
 import { decodePolyline } from "@/lib/routing/polyline";
 import { unwrap } from "@/lib/supabase/unwrap";
 import { Chip } from "@/components/ui/chip";
@@ -14,12 +15,17 @@ import { Progress } from "@/components/ui/progress";
 import { ErrorBanner } from "@/components/ui/table";
 import { MapView } from "@/components/map/map-view";
 import type { MapLine, MapMarker } from "@/components/map/types";
+import { StateTabs } from "@/components/ui/segmented";
+import { EliminarRuta } from "./eliminar-ruta";
 import { EstadoRutaChip } from "./estado-ruta-chip";
+import { TiemposRuta } from "./tiempos-ruta";
 
 const BG = { ok: "bg-ok", bad: "bg-bad", stone: "bg-stone", forest: "bg-forest" } as const;
 
 export function RutaDetalle({ id }: { id: string }) {
   const supabase = useSupabase();
+  const router = useRouter();
+  const [panel, setPanel] = useState<"paradas" | "tiempos">("paradas");
   const { data, error, loading, reload } = useQuery(async () => {
     const [ruta, config] = await Promise.all([
       supabase
@@ -29,7 +35,11 @@ export function RutaDetalle({ id }: { id: string }) {
         )
         .eq("id", id)
         .maybeSingle(),
-      supabase.from("configuracion").select("almacen_lat, almacen_lng").eq("id", true).maybeSingle(),
+      supabase
+        .from("configuracion")
+        .select("almacen_lat, almacen_lng, radio_llegada_m, umbral_estacionamiento_min")
+        .eq("id", true)
+        .maybeSingle(),
     ]);
     return { ruta: unwrap(ruta), config: unwrap(config) };
   }, [id]);
@@ -129,13 +139,50 @@ export function RutaDetalle({ id }: { id: string }) {
           </div>
           <Progress pct={a.pct} />
         </div>
+        <EliminarRuta
+          size="md"
+          ruta={{
+            id: ruta.id,
+            fecha: ruta.fecha,
+            zona: ruta.zona,
+            estado: ruta.estado,
+            chofer: ruta.choferes.nombre,
+            paradas: paradas.length,
+          }}
+          onDeleted={() => router.push("/admin/rutas/creadas")}
+        />
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[460px_minmax(0,1fr)] gap-3.5">
         <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-white">
-          <div className="flex-none border-b border-line-soft px-[18px] py-3 text-[13px] font-bold">
-            Orden de visita
+          <div className="flex-none border-b border-line-soft px-[18px] py-2.5">
+            <StateTabs
+              value={panel}
+              onChange={setPanel}
+              items={[
+                { value: "paradas", label: "Orden de visita" },
+                { value: "tiempos", label: "Tiempos y pausas" },
+              ]}
+            />
           </div>
+          {panel === "tiempos" ? (
+            <TiemposRuta
+              rutaId={ruta.id}
+              umbralMin={c?.umbral_estacionamiento_min ?? 7}
+              radioM={c?.radio_llegada_m ?? 100}
+              version={`${ruta.estado}|${paradas.map((p) => `${p.llegada_at ?? ""}${p.marcada_at ?? ""}`).join(",")}`}
+              paradas={paradas.map((p) => ({
+                id: p.id,
+                orden: p.orden,
+                cliente: p.clientes.nombre,
+                lat: p.clientes.lat,
+                lng: p.clientes.lng,
+                llegada_at: p.llegada_at,
+                llegada_distancia_m: p.llegada_distancia_m,
+                marcada_at: p.marcada_at,
+              }))}
+            />
+          ) : (
           <div className="min-h-0 flex-1 overflow-auto px-[18px]">
             {paradas.map((p) => {
               const cl = p.clientes;
@@ -169,6 +216,12 @@ export function RutaDetalle({ id }: { id: string }) {
                     {p.estado === "rechazado" && p.motivo_rechazo && (
                       <div className="mt-1 text-[11.5px] text-bad">Motivo: {p.motivo_rechazo}</div>
                     )}
+                    {p.llegada_at && (
+                      <div className="mt-1 text-[11.5px] text-muted">
+                        Llegó {horaLima(p.llegada_at)}
+                        {p.marcada_at && ` · atención ${minutosEntre(p.llegada_at, p.marcada_at)} min`}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-[13px] font-bold">{horaCorta(p.hora_estimada_llegada)}</div>
@@ -180,6 +233,7 @@ export function RutaDetalle({ id }: { id: string }) {
               );
             })}
           </div>
+          )}
           <p className="flex-none border-t border-line-soft px-[18px] py-2.5 text-[11.5px] text-muted">
             {ruta.geometria
               ? "Distancias y trazado por calles (OpenRouteService). Los tiempos usan la velocidad promedio configurada, sin tráfico."

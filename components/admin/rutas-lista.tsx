@@ -11,11 +11,12 @@ import type { Enums } from "@/types/database";
 import { Input, Select } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
 import { ErrorBanner, Pager, Row, Table } from "@/components/ui/table";
+import { EliminarRuta } from "./eliminar-ruta";
 import { EstadoRutaChip } from "./estado-ruta-chip";
 import { RutasTabs } from "./rutas-tabs";
 
 const PAGE_SIZE = 25;
-const COLS = "grid-cols-[1.5fr_1.2fr_1.3fr_80px_90px_1.2fr_110px]";
+const COLS = "grid-cols-[1.5fr_1.2fr_1.3fr_80px_90px_1.2fr_110px_90px]";
 
 type Filtro = "activas" | Enums<"estado_ruta"> | "todas";
 const FILTROS: { value: Filtro; label: string }[] = [
@@ -108,7 +109,7 @@ export function RutasLista({ modo }: { modo: "creadas" | "historial" }) {
       <div className="flex-none">
         <Table
           cols={COLS}
-          headers={["Ruta", "Chofer", "Vehículo", "Clientes", "Distancia", "Avance", "Estado"]}
+          headers={["Ruta", "Chofer", "Vehículo", "Clientes", "Distancia", "Avance", "Estado", ""]}
           empty={lista.loading ? "Cargando…" : rows.length === 0 ? "No hay rutas con esos filtros." : null}
         >
           {rows.map((r) => {
@@ -133,6 +134,12 @@ export function RutasLista({ modo }: { modo: "creadas" | "historial" }) {
                 </div>
                 <div>
                   <EstadoRutaChip estado={r.estado} />
+                </div>
+                <div className="text-right">
+                  <EliminarRuta
+                    ruta={{ id: r.id, fecha: r.fecha, zona: r.zona, estado: r.estado, chofer: r.choferes.nombre, paradas: r.paradas.length }}
+                    onDeleted={lista.reload}
+                  />
                 </div>
               </Row>
             );

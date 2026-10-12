@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getClientesDisponibles } from "@/lib/data/clientes-disponibles";
 import { describeDbError } from "@/lib/db-errors";
+import { choferesOcupados } from "@/lib/disponibilidad";
 import { fetchRoadRoute } from "@/lib/routing/ors";
 import { planificarRuta } from "@/lib/routing/plan";
 import { parseHora } from "@/lib/routing/schedule";
@@ -71,6 +72,17 @@ export async function POST(request: Request) {
   ]);
   if (!chofer?.activo) return fail("El chofer no existe o está inactivo.", 422);
   if (!vehiculo?.activo) return fail("El vehículo no existe o está inactivo.", 422);
+
+  // Un chofer con ruta pendiente ese día (o una en curso) no puede recibir otra.
+  const { data: abiertas, error: abiertasError } = await supabase
+    .from("rutas")
+    .select("chofer_id, fecha, estado")
+    .eq("chofer_id", choferId)
+    .in("estado", ["pendiente", "en_curso"]);
+  if (abiertasError) return fail(describeDbError(abiertasError), 500);
+  if (choferesOcupados((abiertas ?? []) as Parameters<typeof choferesOcupados>[0], fecha).has(choferId)) {
+    return fail("Ese chofer ya tiene una ruta asignada para esa fecha (o una en curso). Elimina esa ruta o elige otro chofer.", 409);
+  }
 
   let disponibles;
   try {

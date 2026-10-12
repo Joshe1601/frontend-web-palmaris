@@ -38,6 +38,8 @@ function ConfigFields({ initial }: { initial: Tables<"configuracion"> }) {
   const [lng, setLng] = useState(initial.almacen_lng?.toString() ?? "");
   const [vel, setVel] = useState(initial.velocidad_promedio_kmh.toString());
   const [min, setMin] = useState(initial.tiempo_atencion_min.toString());
+  const [radio, setRadio] = useState(initial.radio_llegada_m.toString());
+  const [umbral, setUmbral] = useState(initial.umbral_estacionamiento_min.toString());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,6 +53,10 @@ function ConfigFields({ initial }: { initial: Tables<"configuracion"> }) {
     const errs: Record<string, string> = { ...coords.errors };
     if (v === null || v <= 0) errs.vel = "Debe ser un número mayor que 0.";
     if (m === null || m < 0 || !Number.isInteger(m)) errs.min = "Debe ser un entero de 0 o más.";
+    const r = parseOpcionalNumero(radio);
+    const u = parseOpcionalNumero(umbral);
+    if (r === null || r < 1 || !Number.isInteger(r)) errs.radio = "Debe ser un entero de 1 o más.";
+    if (u === null || u < 1 || !Number.isInteger(u)) errs.umbral = "Debe ser un entero de 1 o más.";
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
@@ -62,6 +68,8 @@ function ConfigFields({ initial }: { initial: Tables<"configuracion"> }) {
         almacen_lng: coords.lng,
         velocidad_promedio_kmh: v!,
         tiempo_atencion_min: m!,
+        radio_llegada_m: r!,
+        umbral_estacionamiento_min: u!,
         updated_at: new Date().toISOString(),
       })
       .eq("id", true);
@@ -105,6 +113,29 @@ function ConfigFields({ initial }: { initial: Tables<"configuracion"> }) {
           </Field>
           <Field label="Minutos de atención por parada" error={errors.min}>
             <Input inputMode="numeric" value={min} onChange={(e) => setMin(e.target.value)} />
+          </Field>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="text-base font-bold">Control de entregas</h2>
+        <p className="mb-4 mt-0.5 text-[12.5px] text-muted">
+          Reglas que aplica la app del chofer y que el panel usa para marcar esperas largas.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <Field
+            label="Radio para marcar «He llegado» (metros)"
+            error={errors.radio}
+            hint="El chofer solo puede marcar llegada a menos de esta distancia de la tienda."
+          >
+            <Input inputMode="numeric" value={radio} onChange={(e) => setRadio(e.target.value)} />
+          </Field>
+          <Field
+            label="Alerta de estacionamiento (minutos)"
+            error={errors.umbral}
+            hint="Se destaca una permanencia o parada igual o mayor a este tiempo."
+          >
+            <Input inputMode="numeric" value={umbral} onChange={(e) => setUmbral(e.target.value)} />
           </Field>
         </div>
       </section>
